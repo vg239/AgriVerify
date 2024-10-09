@@ -3,12 +3,7 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_cropId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_cropPrice",
+				"name": "_farmerId",
 				"type": "uint256"
 			},
 			{
@@ -17,9 +12,9 @@
 				"type": "string"
 			},
 			{
-				"internalType": "string",
-				"name": "_location",
-				"type": "string"
+				"internalType": "uint256",
+				"name": "_quantity",
+				"type": "uint256"
 			}
 		],
 		"name": "addCrop",
@@ -30,45 +25,74 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "_id",
-				"type": "uint256"
-			},
-			{
 				"internalType": "string",
-				"name": "_farmerName",
+				"name": "_name",
 				"type": "string"
 			}
 		],
-		"name": "addOrUpdateFarmer",
+		"name": "addFarmer",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
+		"anonymous": false,
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "farmers",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "farmerWallet",
-				"type": "address"
-			},
-			{
+				"indexed": false,
 				"internalType": "uint256",
-				"name": "id",
+				"name": "farmerId",
 				"type": "uint256"
 			},
 			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "cropId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
 				"internalType": "string",
-				"name": "farmerName",
+				"name": "cropName",
 				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "quantity",
+				"type": "uint256"
+			}
+		],
+		"name": "CropAdded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "farmerId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "FarmerAdded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "farmerCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -77,54 +101,61 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_farmerAddress",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "getFarmerAndCropDetails",
+		"name": "farmers",
 		"outputs": [
 			{
-				"internalType": "address",
-				"name": "farmerWallet",
-				"type": "address"
-			},
-			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "farmerId",
 				"type": "uint256"
 			},
 			{
 				"internalType": "string",
-				"name": "farmerName",
+				"name": "name",
 				"type": "string"
 			},
 			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "cropId",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "cropPrice",
-						"type": "uint256"
-					},
-					{
-						"internalType": "string",
-						"name": "cropName",
-						"type": "string"
-					},
-					{
-						"internalType": "string",
-						"name": "location",
-						"type": "string"
-					}
-				],
-				"internalType": "struct AgriVerify.Crop[]",
-				"name": "crops",
-				"type": "tuple[]"
+				"internalType": "uint256",
+				"name": "cropCount",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_farmerId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_cropId",
+				"type": "uint256"
+			}
+		],
+		"name": "getCrop",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
