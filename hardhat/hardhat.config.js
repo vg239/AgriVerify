@@ -2,8 +2,8 @@ require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ignition");
 require("dotenv").config();
 
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
-const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY;
+const ALCHEMY_API_KEY = 'lQZfG4SqJSoj1lBu4NsFN1AbmHhRhA';
+const SEPOLIA_PRIVATE_KEY = '8b18ff2be71a2bc96dc05a5ff84c84f7514edf807fcae73dfb70e8760cc7ad06';
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {

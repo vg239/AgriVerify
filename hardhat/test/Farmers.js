@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("AgriVerify", function () {
-  let AgriVerify;
   let agriVerify;
   let owner;
   let addr1;
