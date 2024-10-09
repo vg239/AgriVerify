@@ -8,7 +8,7 @@ import './App.css';
 const contractAddress = "0x0c09bCC46FaA464f480f504F362C652C43D731dF";
 
 const generateUniqueId = () => {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `${Date.now()}-${Math.random()}`;
 };
 
 const Web3FarmerComponent = () => {
@@ -131,7 +131,7 @@ const Web3FarmerComponent = () => {
         {account && (
           <div className="mb-6 bg-gray-800 p-4 rounded">
             <p className="text-green-400 mb-2">Wallet connected: {account}</p>
-            {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId}</p>}
+            {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId.toString()}</p>}
           </div>
         )}
 
@@ -213,7 +213,7 @@ const Web3FarmerComponent = () => {
             <h2 className="text-2xl font-semibold mb-4 text-purple-400">Farmer and Crop Information</h2>
             <div className="bg-gray-700 p-4 rounded">
               <p><strong>Farmer Wallet:</strong> {farmerDetails.farmerWallet}</p>
-              <p><strong>Farmer ID:</strong> {farmerDetails.id}</p>
+              <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
               <p><strong>Farmer Name:</strong> {farmerDetails.farmerName}</p>
             </div>
             <h3 className="text-xl font-semibold mt-4 mb-2 text-purple-400">Crops:</h3>
@@ -223,9 +223,9 @@ const Web3FarmerComponent = () => {
               <ul className="space-y-4">
                 {cropsWithUniqueIds.map((crop) => (
                   <li key={crop.uniqueId} className="bg-gray-700 p-4 rounded">
-                    <p><strong>Crop ID:</strong> {crop.cropId}</p>
+                    <p><strong>Crop ID:</strong> {crop.cropId.toString()}</p>
                     <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                    <p><strong>Price:</strong> {crop.cropPrice}</p>
+                    <p><strong>Price:</strong> {crop.cropPrice.toString()}</p>
                     <p><strong>Location:</strong> {crop.location}</p>
                     <div className="mt-4">
                       <Link 
@@ -285,12 +285,12 @@ const CropDetailsPage = () => {
         <div className="bg-gray-700 p-4 rounded mb-6">
           <p className="text-green-400 font-semibold">Authenticated Farmer: {farmerDetails.farmerName}</p>
         </div>
-        <p className="mb-4"><strong>Farmer ID:</strong> {farmerDetails.id}</p>
+        <p className="mb-4"><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
         <h2 className="text-2xl font-semibold mb-4 text-purple-400">Crop Information</h2>
         <div className="bg-gray-700 p-4 rounded">
-          <p><strong>Crop ID:</strong> {crop.cropId}</p>
+          <p><strong>Crop ID:</strong> {crop.cropId.toString()}</p>
           <p><strong>Crop Name:</strong> {crop.cropName}</p>
-          <p><strong>Price:</strong> {crop.cropPrice}</p>
+          <p><strong>Price:</strong> {crop.cropPrice.toString()}</p>
           <p><strong>Location:</strong> {crop.location}</p>
         </div>
         <button
