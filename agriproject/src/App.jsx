@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Link, useParams, useNavigate } from 'react-router-dom';
 import Web3 from 'web3';
 import { QRCodeSVG } from 'qrcode.react';
 import contractABI from './abi.json';
@@ -22,25 +22,26 @@ const Web3FarmerComponent = () => {
   const [crops, setCrops] = useState([]);
 
   useEffect(() => {
-    const initWeb3 = async () => {
-      if (window.ethereum) {
-        const web3Instance = new Web3(window.ethereum);
-        setWeb3(web3Instance);
-        try {
-          await window.ethereum.enable();
-          const accounts = await web3Instance.eth.getAccounts();
-          setAccount(accounts[0]);
-          const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
-          setContract(contractInstance);
-        } catch (error) {
-          setError("Failed to connect to MetaMask");
-        }
-      } else {
-        setError("Please install MetaMask");
-      }
-    };
     initWeb3();
   }, []);
+
+  const initWeb3 = async () => {
+    if (window.ethereum) {
+      const web3Instance = new Web3(window.ethereum);
+      setWeb3(web3Instance);
+      try {
+        await window.ethereum.enable();
+        const accounts = await web3Instance.eth.getAccounts();
+        setAccount(accounts[0]);
+        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
+        setContract(contractInstance);
+      } catch (error) {
+        setError("Failed to connect to MetaMask");
+      }
+    } else {
+      setError("Please install MetaMask");
+    }
+  };
 
   const addFarmer = async () => {
     setError('');
@@ -114,7 +115,7 @@ const Web3FarmerComponent = () => {
         {account && (
           <div className="mb-6 bg-gray-800 p-4 rounded">
             <p className="text-green-400 mb-2">Wallet connected: {account}</p>
-            {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId}</p>}
+            {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId.toString()}</p>}
           </div>
         )}
 
@@ -167,7 +168,7 @@ const Web3FarmerComponent = () => {
           <div className="mt-8 bg-gray-800 p-6 rounded">
             <h2 className="text-2xl font-semibold mb-4 text-purple-400">Farmer Information</h2>
             <div className="bg-gray-700 p-4 rounded">
-              <p><strong>Farmer ID:</strong> {farmerDetails.id}</p>
+              <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
               <p><strong>Farmer Name:</strong> {farmerDetails.name}</p>
             </div>
             <h3 className="text-xl font-semibold mt-4 mb-2 text-purple-400">Crops:</h3>
@@ -177,13 +178,12 @@ const Web3FarmerComponent = () => {
               <ul className="space-y-4">
                 {crops.map((crop) => (
                   <li key={`${farmerDetails.id}-${crop.cropId}`} className="bg-gray-700 p-4 rounded">
-                    <p><strong>Crop ID:</strong> {crop.cropId}</p>
+                    <p><strong>Crop ID:</strong> {crop.cropId.toString()}</p>
                     <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                    <p><strong>Quantity:</strong> {crop.quantity}</p>
+                    <p><strong>Price:</strong> {crop.quantity.toString()}</p>
                     <div className="mt-4">
                       <Link 
                         to={`/crop/${farmerDetails.id}-${crop.cropId}`}
-                        state={{ farmerDetails, crop }}
                         className="text-blue-400 hover:text-blue-300"
                       >
                         View Details
@@ -211,16 +211,75 @@ const Web3FarmerComponent = () => {
 
 const CropDetailsPage = () => {
   const { cropId } = useParams();
-  const [farmerId, actualCropId] = cropId.split('-');
-  const location = useLocation();
   const navigate = useNavigate();
-  const { farmerDetails, crop } = location.state || {};
+  const [farmerId, actualCropId] = cropId.split('-').map(Number);
+  
+  const [web3Instance, setWeb3] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [farmerDetails, setFarmerDetails] = useState(null);
+  const [cropDetails, setCropDetails] = useState(null);
 
-  if (!farmerDetails || !crop) {
+  useEffect(() => {
+    initWeb3AndFetchDetails();
+  }, [cropId]);
+
+  const initWeb3AndFetchDetails = async () => {
+    try {
+      if (window.ethereum) {
+        const web3 = new Web3(window.ethereum);
+        const contractInstance = new web3.eth.Contract(contractABI, contractAddress);
+        setWeb3(web3);
+        setContract(contractInstance);
+        await fetchDetails(contractInstance);
+      } else {
+        throw new Error("Please install MetaMask");
+      }
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDetails = async (contractInstance) => {
+    try {
+      // Fetch farmer details
+      const farmer = await contractInstance.methods.farmers(farmerId).call();
+      setFarmerDetails({
+        id: farmer.farmerId,
+        name: farmer.name,
+        cropCount: farmer.cropCount
+      });
+
+      // Fetch specific crop details
+      const crop = await contractInstance.methods.getCrop(farmerId, actualCropId).call();
+      setCropDetails({
+        cropId: crop[0],
+        cropName: crop[1],
+        quantity: crop[2]
+      });
+    } catch (error) {
+      setError("Failed to fetch details from blockchain");
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
         <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
-          <p className="text-red-400">Invalid crop details or unauthorized access.</p>
+          <p className="text-purple-400">Loading details from blockchain...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !farmerDetails || !cropDetails) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
+        <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
+          <p className="text-red-400">{error || "Failed to fetch details from blockchain"}</p>
           <button
             onClick={() => navigate('/')}
             className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
@@ -235,16 +294,20 @@ const CropDetailsPage = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
       <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
-        <h1 className="text-3xl font-bold mb-6 text-center text-purple-400">Crop Details</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center text-purple-400">Authenticated Crop Details</h1>
         <div className="bg-gray-700 p-4 rounded mb-6">
-          <p className="text-green-400 font-semibold">Farmer: {farmerDetails.name}</p>
+          <p className="text-green-400 font-semibold">✓ Blockchain Verified Data</p>
         </div>
-        <p className="mb-4"><strong>Farmer ID:</strong> {farmerDetails.id}</p>
-        <h2 className="text-2xl font-semibold mb-4 text-purple-400">Crop Information</h2>
+        <div className="bg-gray-700 p-4 rounded mb-6">
+          <h2 className="text-xl font-semibold mb-2 text-purple-400">Farmer Information</h2>
+          <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
+          <p><strong>Farmer Name:</strong> {farmerDetails.name}</p>
+        </div>
         <div className="bg-gray-700 p-4 rounded">
-          <p><strong>Crop ID:</strong> {crop.cropId}</p>
-          <p><strong>Crop Name:</strong> {crop.cropName}</p>
-          <p><strong>Quantity:</strong> {crop.quantity}</p>
+          <h2 className="text-xl font-semibold mb-2 text-purple-400">Crop Information</h2>
+          <p><strong>Crop ID:</strong> {cropDetails.cropId.toString()}</p>
+          <p><strong>Crop Name:</strong> {cropDetails.cropName}</p>
+          <p><strong>Price:</strong> {cropDetails.quantity.toString()}</p>
         </div>
         <button
           onClick={() => navigate('/')}
