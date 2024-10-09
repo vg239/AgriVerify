@@ -117,8 +117,8 @@ const Web3FarmerComponent = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg">
-      <h1 className="text-3xl font-bold mb-6 text-center">Farmer and Crop Management</h1>
+    <div className="max-w-2xl mx-auto p-6 bg-gray-900 shadow-md rounded-lg text-white">
+      <h1 className="text-3xl font-bold mb-6 text-center text-gray-100">Farmer and Crop Management</h1>
       
       {!account && (
         <div className="mb-6">
@@ -128,8 +128,8 @@ const Web3FarmerComponent = () => {
 
       {account && (
         <div className="mb-6">
-          <p className="text-green-500 mb-2">Wallet connected: {account}</p>
-          {currentFarmerId && <p className="text-green-500">Current Farmer ID: {currentFarmerId}</p>}
+          <p className="text-green-400 mb-2">Wallet connected: {account}</p>
+          {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId}</p>}
         </div>
       )}
 
@@ -142,18 +142,18 @@ const Web3FarmerComponent = () => {
           placeholder="Farmer ID"
           value={farmerId}
           onChange={(e) => setFarmerId(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <input
           type="text"
           placeholder="Farmer Name"
           value={farmerName}
           onChange={(e) => setFarmerName(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <button
           onClick={addOrUpdateFarmer}
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
         >
           Add/Update Farmer
         </button>
@@ -166,32 +166,32 @@ const Web3FarmerComponent = () => {
           placeholder="Crop ID"
           value={cropId}
           onChange={(e) => setCropId(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <input
           type="number"
           placeholder="Crop Price"
           value={cropPrice}
           onChange={(e) => setCropPrice(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <input
           type="text"
           placeholder="Crop Name"
           value={cropName}
           onChange={(e) => setCropName(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <input
           type="text"
           placeholder="Crop Location"
           value={cropLocation}
           onChange={(e) => setCropLocation(e.target.value)}
-          className="w-full p-2 mb-2 border rounded"
+          className="w-full p-2 mb-2 border rounded bg-gray-800 text-white"
         />
         <button
           onClick={addCrop}
-          className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
+          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
         >
           Add Crop
         </button>
@@ -201,7 +201,7 @@ const Web3FarmerComponent = () => {
         <h2 className="text-2xl font-semibold mb-4">Fetch Farmer and Crop Details</h2>
         <button
           onClick={fetchDetails}
-          className="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
+          className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700"
         >
           Fetch Details
         </button>
@@ -210,7 +210,7 @@ const Web3FarmerComponent = () => {
       {farmerDetails && (
         <div className="mt-8">
           <h2 className="text-2xl font-semibold mb-4">Farmer and Crop Information</h2>
-          <div className="bg-gray-100 p-4 rounded">
+          <div className="bg-gray-800 p-4 rounded">
             <p><strong>Farmer Wallet:</strong> {farmerDetails.farmerWallet}</p>
             <p><strong>Farmer ID:</strong> {farmerDetails.id}</p>
             <p><strong>Farmer Name:</strong> {farmerDetails.farmerName}</p>
@@ -222,24 +222,10 @@ const Web3FarmerComponent = () => {
             <ul className="list-disc pl-5">
               {cropsWithUniqueIds.map((crop) => (
                 <li key={crop.uniqueId} className="mb-2">
-                  <p><strong>Crop ID:</strong> {crop.cropId}</p>
-                  <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                  <p><strong>Price:</strong> {crop.cropPrice}</p>
+                  <p><strong>Crop ID:</strong> {crop.id}</p>
+                  <p><strong>Price:</strong> {crop.price}</p>
+                  <p><strong>Name:</strong> {crop.name}</p>
                   <p><strong>Location:</strong> {crop.location}</p>
-                  <Link 
-                    to={`/crop/${crop.uniqueId}`}
-                    state={{ 
-                      farmerDetails: {
-                        farmerWallet: farmerDetails.farmerWallet,
-                        id: farmerDetails.id,
-                        farmerName: farmerDetails.farmerName
-                      }, 
-                      crop 
-                    }}
-                    className="text-blue-500 hover:text-blue-700"
-                  >
-                    View Details
-                  </Link>
                 </li>
               ))}
             </ul>
@@ -250,57 +236,19 @@ const Web3FarmerComponent = () => {
   );
 };
 
-const CropDetailsPage = () => {
-  const { cropId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { farmerDetails, crop } = location.state || {};
-
-  if (!farmerDetails || !crop) {
-    return (
-      <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg">
-        <p className="text-red-500">Invalid crop details or unauthorized access.</p>
-        <button
-          onClick={() => navigate('/')}
-          className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
-        >
-          Back to Main Page
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg">
-      <h1 className="text-3xl font-bold mb-6 text-center">Crop Details</h1>
-      <div className="bg-green-100 p-4 rounded mb-6">
-        <p className="text-green-700 font-semibold">Authenticated Farmer: {farmerDetails.farmerName}</p>
-      </div>
-      <p className="mb-4"><strong>Farmer ID:</strong> {farmerDetails.id}</p>
-      <h2 className="text-2xl font-semibold mb-4">Crop Information</h2>
-      <div className="bg-gray-100 p-4 rounded">
-        <p><strong>Crop ID:</strong> {crop.cropId}</p>
-        <p><strong>Crop Name:</strong> {crop.cropName}</p>
-        <p><strong>Price:</strong> {crop.cropPrice}</p>
-        <p><strong>Location:</strong> {crop.location}</p>
-      </div>
-      <button
-        onClick={() => navigate('/')}
-        className="mt-6 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
-      >
-        Back to Main Page
-      </button>
-    </div>
-  );
-};
-
 const App = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Web3FarmerComponent />} />
-        <Route path="/crop/:cropId" element={<CropDetailsPage />} />
-      </Routes>
+      <div className="bg-gray-800 min-h-screen text-white">
+        <nav className="bg-gray-900 p-4 mb-6">
+          <Link to="/" className="text-white text-2xl font-bold">
+            Farmer Management DApp
+          </Link>
+        </nav>
+        <Routes>
+          <Route path="/" element={<Web3FarmerComponent />} />
+        </Routes>
+      </div>
     </Router>
   );
 };
