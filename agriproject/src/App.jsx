@@ -1,15 +1,87 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, useParams, useNavigate } from 'react-router-dom';
 import Web3 from 'web3';
-import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import contractABI from './abi.json';
 import Dashboard from './Dashboard';
 import './App.css';
 
-const contractAddress = "0x95f26527FC4b8E1bAE276Ec52056bc4A420dC0E8";
+const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
 const ALCHEMY_RPC = "https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1AbmHhRhAtH";
 
 const publicWeb3 = new Web3(new Web3.providers.HttpProvider(ALCHEMY_RPC));
+
+// Updated QR code generation function using qrcode library
+const generateQRCodeDataUrl = async (url) => {
+  try {
+    const qrCodeDataUrl = await QRCode.toDataURL(url, {
+      width: 1024,
+      margin: 1,
+      errorCorrectionLevel: 'H'
+    });
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw new Error('Failed to generate QR code');
+  }
+};
+// Updated IPFS upload function with proper error handling and authentication
+const pinJSONToIPFS = async (jsonData) => {
+  const url = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
+  
+  // Replace these with your actual Pinata API keys
+  const pinataApiKey = '1547904667caa674ab32';
+  const pinataSecretApiKey = '71627debb1bd62c8892935c45688feaccc09c8df7da195612738f92006845b8f';
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': pinataApiKey,
+        'pinata_secret_api_key': pinataSecretApiKey,
+      },
+      body: JSON.stringify(jsonData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.IpfsHash;
+  } catch (error) {
+    console.error('Error pinning to IPFS:', error);
+    throw new Error(`Failed to upload to IPFS: ${error.message}`);
+  }
+};
+
+// Generate NFT metadata function
+const generateNFTMetadata = (cropData, qrCodeDataUrl, farmerId) => {
+  return {
+    name: `Crop ${cropData.cropId} - ${cropData.cropName}`,
+    description: `Farmer ID: ${farmerId}, Crop: ${cropData.cropName}, Quantity: ${cropData.quantity}`,
+    image: qrCodeDataUrl,
+    attributes: [
+      {
+        trait_type: "Farmer ID",
+        value: farmerId
+      },
+      {
+        trait_type: "Crop ID",
+        value: cropData.cropId
+      },
+      {
+        trait_type: "Crop Name",
+        value: cropData.cropName
+      },
+      {
+        trait_type: "Quantity",
+        value: cropData.quantity
+      }
+    ]
+  };
+};
 
 const Web3FarmerComponent = () => {
   const [web3Instance, setWeb3] = useState(null);
@@ -25,9 +97,9 @@ const Web3FarmerComponent = () => {
   const [currentFarmerId, setCurrentFarmerId] = useState(null);
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [crops, setCrops] = useState([]);
+  const [minting, setMinting] = useState(false);
 
   useEffect(() => {
-    // Initialize public contract for read-only operations
     const publicContractInstance = new publicWeb3.eth.Contract(contractABI, contractAddress);
     setPublicContract(publicContractInstance);
   }, []);
@@ -49,7 +121,6 @@ const Web3FarmerComponent = () => {
       setError("Please install MetaMask");
     }
   };
-
   const disconnectWallet = () => {
     setWeb3(null);
     setAccount('');
@@ -59,7 +130,6 @@ const Web3FarmerComponent = () => {
     setCrops([]);
   };
 
-
   const addFarmer = async () => {
     setError('');
     if (!contract || !account) return setError('Please connect your wallet first');
@@ -68,10 +138,11 @@ const Web3FarmerComponent = () => {
     try {
       await contract.methods.addFarmer(farmerName).send({ from: account });
       const farmerCount = await contract.methods.farmerCount().call();
-      setCurrentFarmerId(farmerCount);
+      const farmerCountNumber = Number(farmerCount); // Convert BigInt to Number
+      setCurrentFarmerId(farmerCountNumber);
       setFarmerName('');
       setCrops([]);
-      fetchFarmerDetails(farmerCount);
+      fetchFarmerDetails(farmerCountNumber);
     } catch (error) {
       setError(`Failed to add farmer: ${error.message}`);
     }
@@ -82,35 +153,73 @@ const Web3FarmerComponent = () => {
     if (!contract || !account) return setError('Please connect your wallet first');
     if (!currentFarmerId) return setError('Please create or select a farmer first');
     if (!cropName || !quantity) return setError('Please fill in all crop details');
-
+  
     try {
-      await contract.methods.addCrop(currentFarmerId, cropName, quantity)
+      setMinting(true);
+  
+      const nextCropId = Number(farmerDetails?.cropCount) + 1 || 1;
+      const qrCodeUrl = `${window.location.origin}/crop/${currentFarmerId}-${nextCropId}`;
+      
+      // Generate QR code data URL using updated function
+      const qrCodeDataUrl = await generateQRCodeDataUrl(qrCodeUrl);
+      console.log('QR Code generated successfully');
+  
+      const metadata = generateNFTMetadata(
+        { 
+          cropId: nextCropId,
+          cropName, 
+          quantity 
+        },
+        qrCodeDataUrl,
+        currentFarmerId
+      );
+  
+      console.log('Uploading to IPFS...');
+      let ipfsHash;
+      try {
+        ipfsHash = await pinJSONToIPFS(metadata);
+        console.log('IPFS Hash:', ipfsHash);
+      } catch (ipfsError) {
+        console.error('IPFS Upload Error:', ipfsError);
+        throw new Error(`IPFS Upload failed: ${ipfsError.message}`);
+      }
+  
+      if (!ipfsHash) {
+        throw new Error('Failed to get IPFS hash');
+      }
+  
+      console.log('Adding crop to blockchain...');
+      await contract.methods.addCrop(currentFarmerId, cropName, quantity, ipfsHash)
         .send({ from: account });
+  
       setCropName('');
       setQuantity('');
       fetchFarmerDetails(currentFarmerId);
     } catch (error) {
-      setError(`Failed to add crop: ${error.message}`);
+      console.error('Full error:', error);
+      setError(`Failed to add crop and mint NFT: ${error.message}`);
+    } finally {
+      setMinting(false);
     }
   };
-
+  
   const fetchFarmerDetails = async (farmerId) => {
     try {
       const contractToUse = contract || publicContract;
       const farmer = await contractToUse.methods.farmers(farmerId).call();
       setFarmerDetails({
-        id: farmer.farmerId,
+        id: Number(farmer.farmerId),
         name: farmer.name,
-        cropCount: farmer.cropCount
+        cropCount: Number(farmer.cropCount)
       });
 
       const cropsList = [];
-      for (let i = 1; i <= farmer.cropCount; i++) {
+      for (let i = 1; i <= Number(farmer.cropCount); i++) {
         const crop = await contractToUse.methods.getCrop(farmerId, i).call();
         cropsList.push({
-          cropId: crop[0],
+          cropId: Number(crop[0]),
           cropName: crop[1],
-          quantity: crop[2]
+          quantity: Number(crop[2])
         });
       }
       setCrops(cropsList);
@@ -135,7 +244,9 @@ const Web3FarmerComponent = () => {
           ) : (
             <div className="bg-gray-800 p-4 rounded">
               <p className="text-green-400 mb-2">Wallet connected: {account}</p>
-              {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId.toString()}</p>}
+              {currentFarmerId && (
+                <p className="text-green-400">Current Farmer ID: {currentFarmerId.toString()}</p>
+              )}
               <button
                 onClick={disconnectWallet}
                 className="w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors mt-2"
@@ -145,6 +256,7 @@ const Web3FarmerComponent = () => {
             </div>
           )}
         </div>
+        
         {error && <p className="text-red-400 mb-4">{error}</p>}
 
         <div className="mb-8 bg-gray-800 p-6 rounded">
@@ -158,7 +270,7 @@ const Web3FarmerComponent = () => {
           />
           <button
             onClick={addFarmer}
-            className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700 transition-colors"
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
           >
             Add Farmer
           </button>
@@ -181,58 +293,98 @@ const Web3FarmerComponent = () => {
               onChange={(e) => setQuantity(e.target.value)}
               className="w-full p-2 mb-2 border rounded bg-gray-700 text-white border-gray-600"
             />
+            
             <button
               onClick={addCrop}
               className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors"
+              disabled={minting}
             >
-              Add Crop
+              {minting ? 'Minting NFT...' : 'Add Crop'}
             </button>
           </div>
         )}
 
-        {farmerDetails && (
-          <div className="mt-8 bg-gray-800 p-6 rounded">
-            <h2 className="text-2xl font-semibold mb-4 text-purple-400">Farmer Information</h2>
-            <div className="bg-gray-700 p-4 rounded">
-              <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
-              <p><strong>Farmer Name:</strong> {farmerDetails.name}</p>
+        {minting && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+            <div className="bg-gray-800 p-8 rounded text-center text-white">
+              <h2 className="text-xl font-bold mb-4">Minting NFT...</h2>
+              <p>Please wait while we mint your crop as an NFT.</p>
             </div>
-            <h3 className="text-xl font-semibold mt-4 mb-2 text-purple-400">Crops:</h3>
-            {crops.length === 0 ? (
-              <p>No crops added yet.</p>
-            ) : (
-              <ul className="space-y-4">
-                {crops.map((crop) => (
-                  <li key={`${farmerDetails.id}-${crop.cropId}`} className="bg-gray-700 p-4 rounded">
-                    <p><strong>Crop ID:</strong> {crop.cropId.toString()}</p>
-                    <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                    <p><strong>Price:</strong> {crop.quantity.toString()}</p>
-                    <div className="mt-4">
-                      <Link 
-                        to={`/crop/${farmerDetails.id}-${crop.cropId}`}
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        View Details
-                      </Link>
-                      <div className="mt-2">
-                        <QRCodeSVG
-                          value={`${window.location.origin}/crop/${farmerDetails.id}-${crop.cropId}`}
-                          size={128}
-                          level="H"
-                          includeMargin={true}
-                          className="bg-white p-2 rounded"
-                        />
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+          </div>
+        )}
+
+        {farmerDetails && (
+          <div className="mb-8 bg-gray-800 p-6 rounded">
+            <h2 className="text-2xl font-semibold mb-4 text-purple-400">Farmer Details</h2>
+            <p className="mb-2"><strong>ID:</strong> {farmerDetails.id}</p>
+            <p className="mb-4"><strong>Name:</strong> {farmerDetails.name}</p>
+            <h3 className="text-xl font-semibold mb-4 text-purple-400">Crops</h3>
+            {crops.map((crop, index) => (
+              <div key={index} className="border-b border-gray-700 py-2">
+                <p><strong>Crop ID:</strong> {crop.cropId}</p>
+                <p><strong>Name:</strong> {crop.cropName}</p>
+                <p><strong>Quantity:</strong> {crop.quantity}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>
     </div>
   );
+};
+const addCrop = async () => {
+  setError('');
+  if (!contract || !account) return setError('Please connect your wallet first');
+  if (!currentFarmerId) return setError('Please create or select a farmer first');
+  if (!cropName || !quantity) return setError('Please fill in all crop details');
+
+  try {
+    setMinting(true);
+
+    // Generate QR code URL
+    const nextCropId = Number(farmerDetails?.cropCount) + 1 || 1;
+    const qrCodeUrl = `${window.location.origin}/crop/${currentFarmerId}-${nextCropId}`;
+    
+    // Create QR code data URL using QRCodeSVG
+    const qrCodeElement = document.createElement('div');
+    ReactDOM.render(
+      <QRCodeSVG
+        value={qrCodeUrl}
+        size={1024}
+        level="H"
+        includeMargin={true}
+      />,
+      qrCodeElement
+    );
+    
+    // Convert SVG to data URL
+    const svgString = qrCodeElement.innerHTML;
+    const qrCodeDataUrl = `data:image/svg+xml;base64,${btoa(svgString)}`;
+
+    const metadata = generateNFTMetadata(
+      { 
+        cropId: nextCropId,
+        cropName, 
+        quantity 
+      },
+      qrCodeDataUrl,
+      currentFarmerId
+    );
+
+    const ipfsHash = await pinJSONToIPFS(metadata);
+    console.log('IPFS Hash:', ipfsHash);
+
+    await contract.methods.addCrop(currentFarmerId, cropName, quantity, ipfsHash)
+      .send({ from: account });
+
+    setCropName('');
+    setQuantity('');
+    fetchFarmerDetails(currentFarmerId);
+  } catch (error) {
+    setError(`Failed to add crop and mint NFT: ${error.message}`);
+  } finally {
+    setMinting(false);
+  }
 };
 const CropDetailsPage = () => {
   const { cropId } = useParams();
@@ -247,23 +399,20 @@ const CropDetailsPage = () => {
   useEffect(() => {
     const fetchDetails = async () => {
       try {
-        // Create a new contract instance using the public Web3
         const publicContract = new publicWeb3.eth.Contract(contractABI, contractAddress);
         
-        // Fetch farmer details
         const farmer = await publicContract.methods.farmers(farmerId).call();
         setFarmerDetails({
-          id: farmer.farmerId,
+          id: Number(farmer.farmerId),
           name: farmer.name,
-          cropCount: farmer.cropCount
+          cropCount: Number(farmer.cropCount)
         });
 
-        // Fetch specific crop details
         const crop = await publicContract.methods.getCrop(farmerId, actualCropId).call();
         setCropDetails({
-          cropId: crop[0],
+          cropId: Number(crop[0]),
           cropName: crop[1],
-          quantity: crop[2]
+          quantity: Number(crop[2])
         });
       } catch (error) {
         console.error("Fetch error:", error);
@@ -337,32 +486,6 @@ const CropDetailsPage = () => {
 };
 
 const App = () => {
-  const [web3Instance, setWeb3] = useState(null);
-  const [account, setAccount] = useState('');
-  const [contract, setContract] = useState(null);
-
-  useEffect(() => {
-    initWeb3();
-  }, []);
-
-  const initWeb3 = async () => {
-    if (window.ethereum) {
-      const web3Instance = new Web3(window.ethereum);
-      setWeb3(web3Instance);
-      try {
-        await window.ethereum.enable();
-        const accounts = await web3Instance.eth.getAccounts();
-        setAccount(accounts[0]);
-        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
-        setContract(contractInstance);
-      } catch (error) {
-        console.error("Failed to connect to MetaMask");
-      }
-    } else {
-      console.error("Please install MetaMask");
-    }
-  };
-
   return (
     <Router>
       <div className="min-h-screen bg-gray-900">
@@ -372,34 +495,14 @@ const App = () => {
               Manage Farmers
             </Link>
             <Link to="/dashboard" className="text-purple-400 hover:text-purple-300">
-              Dashboard
+              Dashboard 
             </Link>
           </div>
         </nav>
 
         <Routes>
-          <Route 
-            path="/" 
-            element={
-              <Web3FarmerComponent 
-                web3Instance={web3Instance}
-                account={account}
-                contract={contract}
-                contractAddress={contractAddress}
-              />
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <Dashboard 
-                web3Instance={web3Instance}
-                account={account}
-                contract={contract}
-                contractAddress={contractAddress}
-              />
-            } 
-          />
+          <Route path="/" element={<Web3FarmerComponent />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/crop/:cropId" element={<CropDetailsPage />} />
         </Routes>
       </div>
