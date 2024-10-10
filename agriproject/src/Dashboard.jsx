@@ -128,7 +128,7 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
         ) : (
           <div className="space-y-6">
             {filteredFarmers.map((farmer) => (
-              <div key={farmer.id.toString()} className="bg-gray-800 p-6 rounded transition-all duration-300 hover:bg-gray-750">
+              <div key={farmer.id} className="bg-gray-800 p-6 rounded transition-all duration-300 hover:bg-gray-750">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h2 className="text-2xl font-semibold text-purple-400">
