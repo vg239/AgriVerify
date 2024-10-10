@@ -7,9 +7,8 @@ import Dashboard from './Dashboard';
 import './App.css';
 
 const contractAddress = "0x95f26527FC4b8E1bAE276Ec52056bc4A420dC0E8";
-const ALCHEMY_RPC = `https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1AbmHhRhAtH`;
+const ALCHEMY_RPC = "https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1AbmHhRhAtH";
 
-// Create a read-only Web3 instance for public access
 const publicWeb3 = new Web3(new Web3.providers.HttpProvider(ALCHEMY_RPC));
 
 const Web3FarmerComponent = () => {
