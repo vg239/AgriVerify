@@ -8,41 +8,14 @@ import './App.css';
 
 const contractAddress = "0x95f26527FC4b8E1bAE276Ec52056bc4A420dC0E8";
 
-const Web3FarmerComponent = () => {
-  const [web3Instance, setWeb3] = useState(null);
-  const [account, setAccount] = useState('');
-  const [contract, setContract] = useState(null);
+const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, disconnectWallet }) => {
   const [error, setError] = useState('');
-
   const [farmerName, setFarmerName] = useState('');
   const [cropName, setCropName] = useState('');
   const [quantity, setQuantity] = useState('');
-  
   const [currentFarmerId, setCurrentFarmerId] = useState(null);
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [crops, setCrops] = useState([]);
-
-  useEffect(() => {
-    initWeb3();
-  }, []);
-
-  const initWeb3 = async () => {
-    if (window.ethereum) {
-      const web3Instance = new Web3(window.ethereum);
-      setWeb3(web3Instance);
-      try {
-        await window.ethereum.enable();
-        const accounts = await web3Instance.eth.getAccounts();
-        setAccount(accounts[0]);
-        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
-        setContract(contractInstance);
-      } catch (error) {
-        setError("Failed to connect to MetaMask");
-      }
-    } else {
-      setError("Please install MetaMask");
-    }
-  };
 
   const addFarmer = async () => {
     setError('');
@@ -107,21 +80,30 @@ const Web3FarmerComponent = () => {
       <div className="max-w-2xl mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6 text-center text-purple-400">Farmer and Crop Management</h1>
         
-        {!account && (
-          <div className="mb-6">
-            <p className="text-red-400 mb-2">Please connect your MetaMask wallet to use this application.</p>
-          </div>
-        )}
-
-        {account && (
-          <div className="mb-6 bg-gray-800 p-4 rounded">
-            <p className="text-green-400 mb-2">Wallet connected: {account}</p>
-            {currentFarmerId && <p className="text-green-400">Current Farmer ID: {currentFarmerId.toString()}</p>}
-          </div>
-        )}
+        <div className="mb-6 bg-gray-800 p-4 rounded flex justify-between items-center">
+          {account ? (
+            <>
+              <p className="text-green-400">Wallet connected: {account}</p>
+              <button
+                onClick={disconnectWallet}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={connectWallet}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
+            >
+              Connect Wallet
+            </button>
+          )}
+        </div>
 
         {error && <p className="text-red-400 mb-4">{error}</p>}
 
+        {/* Farmer Management Section */}
         <div className="mb-8 bg-gray-800 p-6 rounded">
           <h2 className="text-2xl font-semibold mb-4 text-purple-400">Add New Farmer</h2>
           <input
@@ -134,9 +116,13 @@ const Web3FarmerComponent = () => {
           <button
             onClick={addFarmer}
             className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700 transition-colors"
+            disabled={!account}
           >
             Add Farmer
           </button>
+          {!account && (
+            <p className="text-yellow-400 mt-2 text-sm">Connect wallet to add farmers</p>
+          )}
         </div>
 
         {currentFarmerId && (
@@ -159,9 +145,13 @@ const Web3FarmerComponent = () => {
             <button
               onClick={addCrop}
               className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors"
+              disabled={!account}
             >
               Add Crop
             </button>
+            {!account && (
+              <p className="text-yellow-400 mt-2 text-sm">Connect wallet to add crops</p>
+            )}
           </div>
         )}
 
@@ -181,7 +171,7 @@ const Web3FarmerComponent = () => {
                   <li key={`${farmerDetails.id}-${crop.cropId}`} className="bg-gray-700 p-4 rounded">
                     <p><strong>Crop ID:</strong> {crop.cropId.toString()}</p>
                     <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                    <p><strong>Price:</strong> {crop.quantity.toString()}</p>
+                    <p><strong>Quantity:</strong> {crop.quantity.toString()}</p>
                     <div className="mt-4">
                       <Link 
                         to={`/crop/${farmerDetails.id}-${crop.cropId}`}
@@ -210,42 +200,38 @@ const Web3FarmerComponent = () => {
   );
 };
 
-const CropDetailsPage = () => {
+const CropDetailsPage = ({ web3Instance, contract }) => {
   const { cropId } = useParams();
   const navigate = useNavigate();
-  const [farmerId, actualCropId] = cropId.split('-').map(Number);
-  
-  const [web3Instance, setWeb3] = useState(null);
-  const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [cropDetails, setCropDetails] = useState(null);
 
   useEffect(() => {
-    initWeb3AndFetchDetails();
-  }, [cropId]);
+    if (contract) {
+      fetchDetails();
+    } else {
+      initPublicWeb3AndFetchDetails();
+    }
+  }, [cropId, contract]);
 
-  const initWeb3AndFetchDetails = async () => {
+  const initPublicWeb3AndFetchDetails = async () => {
     try {
-      if (window.ethereum) {
-        const web3 = new Web3(window.ethereum);
-        const contractInstance = new web3.eth.Contract(contractABI, contractAddress);
-        setWeb3(web3);
-        setContract(contractInstance);
-        await fetchDetails(contractInstance);
-      } else {
-        throw new Error("Please install MetaMask");
-      }
+      // Use a public RPC endpoint for read-only access
+      const publicWeb3 = new Web3('https://eth-mainnet.g.alchemy.com/v2/your-api-key'); // Replace with your public RPC endpoint
+      const publicContract = new publicWeb3.eth.Contract(contractABI, contractAddress);
+      await fetchDetails(publicContract);
     } catch (error) {
-      setError(error.message);
-    } finally {
+      setError('Failed to connect to blockchain');
       setLoading(false);
     }
   };
 
-  const fetchDetails = async (contractInstance) => {
+  const fetchDetails = async (contractInstance = contract) => {
     try {
+      const [farmerId, actualCropId] = cropId.split('-').map(Number);
+      
       // Fetch farmer details
       const farmer = await contractInstance.methods.farmers(farmerId).call();
       setFarmerDetails({
@@ -263,6 +249,8 @@ const CropDetailsPage = () => {
       });
     } catch (error) {
       setError("Failed to fetch details from blockchain");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,7 +296,7 @@ const CropDetailsPage = () => {
           <h2 className="text-xl font-semibold mb-2 text-purple-400">Crop Information</h2>
           <p><strong>Crop ID:</strong> {cropDetails.cropId.toString()}</p>
           <p><strong>Crop Name:</strong> {cropDetails.cropName}</p>
-          <p><strong>Price:</strong> {cropDetails.quantity.toString()}</p>
+          <p><strong>Quantity:</strong> {cropDetails.quantity.toString()}</p>
         </div>
         <button
           onClick={() => navigate('/')}
@@ -326,20 +314,20 @@ const App = () => {
   const [account, setAccount] = useState('');
   const [contract, setContract] = useState(null);
 
-  useEffect(() => {
-    initWeb3();
-  }, []);
-
-  const initWeb3 = async () => {
+  const connectWallet = async () => {
     if (window.ethereum) {
-      const web3Instance = new Web3(window.ethereum);
-      setWeb3(web3Instance);
       try {
+        const web3Instance = new Web3(window.ethereum);
         await window.ethereum.enable();
         const accounts = await web3Instance.eth.getAccounts();
-        setAccount(accounts[0]);
         const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
+        
+        setWeb3(web3Instance);
+        setAccount(accounts[0]);
         setContract(contractInstance);
+
+        // Add event listener for account changes
+        window.ethereum.on('accountsChanged', handleAccountsChanged);
       } catch (error) {
         console.error("Failed to connect to MetaMask");
       }
@@ -348,17 +336,59 @@ const App = () => {
     }
   };
 
+  const disconnectWallet = () => {
+    setWeb3(null);
+    setAccount('');
+    setContract(null);
+    // Remove event listener
+    if (window.ethereum) {
+      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    }
+  };
+
+  const handleAccountsChanged = (accounts) => {
+    if (accounts.length === 0) {
+      // User disconnected their wallet
+      disconnectWallet();
+    } else {
+      // User switched accounts
+      setAccount(accounts[0]);
+    }
+  };
+
+  useEffect(() => {
+    // Check if wallet was previously connected
+    if (window.ethereum) {
+      window.ethereum.request({ method: 'eth_accounts' })
+        .then(accounts => {
+          if (accounts.length > 0) {
+            connectWallet();
+          }
+        })
+        .catch(console.error);
+    }
+
+    return () => {
+      // Cleanup event listeners
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      }
+    };
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-900">
         <nav className="bg-gray-800 p-4">
-          <div className="max-w-4xl mx-auto flex justify-center space-x-6">
-            <Link to="/" className="text-purple-400 hover:text-purple-300">
-              Manage Farmers
-            </Link>
-            <Link to="/dashboard" className="text-purple-400 hover:text-purple-300">
-              Dashboard
-            </Link>
+          <div className="max-w-4xl mx-auto flex justify-between items-center">
+            <div className="flex space-x-6">
+              <Link to="/" className="text-purple-400 hover:text-purple-300">
+                Manage Farmers
+              </Link>
+              <Link to="/dashboard" className="text-purple-400 hover:text-purple-300">
+                Dashboard
+              </Link>
+            </div>
           </div>
         </nav>
 
@@ -370,7 +400,8 @@ const App = () => {
                 web3Instance={web3Instance}
                 account={account}
                 contract={contract}
-                contractAddress={contractAddress}
+                connectWallet={connectWallet}
+                disconnectWallet={disconnectWallet}
               />
             } 
           />
@@ -381,11 +412,20 @@ const App = () => {
                 web3Instance={web3Instance}
                 account={account}
                 contract={contract}
-                contractAddress={contractAddress}
+                connectWallet={connectWallet}
+                disconnectWallet={disconnectWallet}
               />
             } 
           />
-          <Route path="/crop/:cropId" element={<CropDetailsPage />} />
+          <Route 
+            path="/crop/:cropId" 
+            element={
+              <CropDetailsPage 
+                web3Instance={web3Instance}
+                contract={contract}
+              />
+            } 
+          />
         </Routes>
       </div>
     </Router>
