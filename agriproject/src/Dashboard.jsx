@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Web3 from 'web3';
 import { QRCodeSVG } from 'qrcode.react';
+import { Search } from 'lucide-react';
 
 const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
   const [farmers, setFarmers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchId, setSearchId] = useState('');
+  const [filteredFarmers, setFilteredFarmers] = useState([]);
 
   useEffect(() => {
     if (contract && account) {
       fetchAllFarmers();
     }
   }, [contract, account]);
+
+  useEffect(() => {
+    filterFarmers();
+  }, [searchId, farmers]);
 
   const fetchAllFarmers = async () => {
     try {
@@ -51,6 +57,18 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
     }
   };
 
+  const filterFarmers = () => {
+    if (!searchId.trim()) {
+      setFilteredFarmers(farmers);
+      return;
+    }
+
+    const filtered = farmers.filter(farmer => 
+      farmer.id.toString().includes(searchId.trim())
+    );
+    setFilteredFarmers(filtered);
+  };
+
   if (!account) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100">
@@ -84,6 +102,23 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
           <p className="text-green-400">Connected Wallet: {account}</p>
         </div>
 
+        {/* Search Box */}
+        <div className="mb-6 bg-gray-800 p-4 rounded">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by Farmer ID..."
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          {filteredFarmers.length === 0 && searchId && (
+            <p className="mt-2 text-yellow-400">No farmers found with ID: {searchId}</p>
+          )}
+        </div>
+
         {error && <p className="text-red-400 mb-4">{error}</p>}
 
         {farmers.length === 0 ? (
@@ -92,39 +127,51 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
           </div>
         ) : (
           <div className="space-y-6">
-            {farmers.map((farmer) => (
-              <div key={farmer.id} className="bg-gray-800 p-6 rounded">
-                <h2 className="text-2xl font-semibold mb-4 text-purple-400">
-                  Farmer: {farmer.name}
-                </h2>
-                <p className="mb-2">Farmer ID: {farmer.id}</p>
-                <p className="mb-4">Total Crops: {farmer.cropCount}</p>
+            {filteredFarmers.map((farmer) => (
+              <div key={farmer.id.toString()} className="bg-gray-800 p-6 rounded transition-all duration-300 hover:bg-gray-750">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-purple-400">
+                      Farmer: {farmer.name}
+                    </h2>
+                    <p className="text-gray-300">Farmer ID: {farmer.id.toString()}</p>
+                    <p className="text-gray-300">Total Crops: {farmer.cropCount.toString()}</p>
+                  </div>
+                </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-purple-400">Crops</h3>
-                  {farmer.crops.map((crop) => (
-                    <div key={`${farmer.id}-${crop.cropId}`} className="bg-gray-700 p-4 rounded">
-                      <p><strong>Crop Name:</strong> {crop.cropName}</p>
-                      <p><strong>Quantity:</strong> {crop.quantity}</p>
-                      <div className="mt-4">
-                        <Link 
-                          to={`/crop/${farmer.id}-${crop.cropId}`}
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          View Details
-                        </Link>
-                        <div className="mt-2">
-                          <QRCodeSVG
-                            value={`${window.location.origin}/crop/${farmer.id}-${crop.cropId}`}
-                            size={128}
-                            level="H"
-                            includeMargin={true}
-                            className="bg-white p-2 rounded"
-                          />
+                <div className="space-y-4 mt-6">
+                  <h3 className="text-xl font-semibold text-purple-400 border-b border-gray-700 pb-2">
+                    Crops
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {farmer.crops.map((crop) => (
+                      <div 
+                        key={`${farmer.id}-${crop.cropId}`} 
+                        className="bg-gray-700 p-4 rounded hover:bg-gray-650 transition-colors"
+                      >
+                        <p className="font-semibold text-purple-300">Crop #{crop.cropId.toString()}</p>
+                        <p><strong>Name:</strong> {crop.cropName}</p>
+                        <p><strong>Quantity:</strong> {crop.quantity.toString()}</p>
+                        <div className="mt-4">
+                          <Link 
+                            to={`/crop/${farmer.id}-${crop.cropId}`}
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            View Details
+                          </Link>
+                          <div className="mt-2">
+                            <QRCodeSVG
+                              value={`${window.location.origin}/crop/${farmer.id}-${crop.cropId}`}
+                              size={128}
+                              level="H"
+                              includeMargin={true}
+                              className="bg-white p-2 rounded"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
