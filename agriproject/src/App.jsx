@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, useParams, useNavigate } from 'react-router-dom';
-import Web3 from 'web3';
+import { ethers } from 'ethers';
 import { QRCodeSVG } from 'qrcode.react';
 import contractABI from './abi.json';
 import Dashboard from './Dashboard';
 import './App.css';
 
 const contractAddress = "0x95f26527FC4b8E1bAE276Ec52056bc4A420dC0E8";
+const ALCHEMY_RPC = `https://eth-sepolia.g.alchemy.com/v2/${process.env.VITE_REACT_APP_ALCHEMY_API_KEY}`;
 
-const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, disconnectWallet }) => {
+const Web3FarmerComponent = ({ provider, signer, contract, connectWallet, disconnectWallet }) => {
   const [error, setError] = useState('');
   const [farmerName, setFarmerName] = useState('');
   const [cropName, setCropName] = useState('');
@@ -16,19 +17,31 @@ const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, d
   const [currentFarmerId, setCurrentFarmerId] = useState(null);
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [crops, setCrops] = useState([]);
+  const [account, setAccount] = useState('');
+
+  useEffect(() => {
+    const getAccount = async () => {
+      if (signer) {
+        const address = await signer.getAddress();
+        setAccount(address);
+      }
+    };
+    getAccount();
+  }, [signer]);
 
   const addFarmer = async () => {
     setError('');
-    if (!contract || !account) return setError('Please connect your wallet first');
+    if (!contract || !signer) return setError('Please connect your wallet first');
     if (!farmerName) return setError('Please enter Farmer Name');
 
     try {
-      await contract.methods.addFarmer(farmerName).send({ from: account });
-      const farmerCount = await contract.methods.farmerCount().call();
-      setCurrentFarmerId(farmerCount);
+      const tx = await contract.connect(signer).addFarmer(farmerName);
+      await tx.wait();
+      const farmerCount = await contract.farmerCount();
+      setCurrentFarmerId(farmerCount.toString());
       setFarmerName('');
       setCrops([]);
-      fetchFarmerDetails(farmerCount);
+      fetchFarmerDetails(farmerCount.toString());
     } catch (error) {
       setError(`Failed to add farmer: ${error.message}`);
     }
@@ -36,13 +49,13 @@ const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, d
 
   const addCrop = async () => {
     setError('');
-    if (!contract || !account) return setError('Please connect your wallet first');
+    if (!contract || !signer) return setError('Please connect your wallet first');
     if (!currentFarmerId) return setError('Please create or select a farmer first');
     if (!cropName || !quantity) return setError('Please fill in all crop details');
 
     try {
-      await contract.methods.addCrop(currentFarmerId, cropName, quantity)
-        .send({ from: account });
+      const tx = await contract.connect(signer).addCrop(currentFarmerId, cropName, quantity);
+      await tx.wait();
       setCropName('');
       setQuantity('');
       fetchFarmerDetails(currentFarmerId);
@@ -53,20 +66,20 @@ const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, d
 
   const fetchFarmerDetails = async (farmerId) => {
     try {
-      const farmer = await contract.methods.farmers(farmerId).call();
+      const farmer = await contract.farmers(farmerId);
       setFarmerDetails({
-        id: farmer.farmerId,
+        id: farmer.farmerId.toString(),
         name: farmer.name,
-        cropCount: farmer.cropCount
+        cropCount: farmer.cropCount.toString()
       });
 
       const cropsList = [];
-      for (let i = 1; i <= farmer.cropCount; i++) {
-        const crop = await contract.methods.getCrop(farmerId, i).call();
+      for (let i = 1; i <= farmer.cropCount.toString(); i++) {
+        const crop = await contract.getCrop(farmerId, i);
         cropsList.push({
-          cropId: crop[0],
+          cropId: crop[0].toString(),
           cropName: crop[1],
-          quantity: crop[2]
+          quantity: crop[2].toString()
         });
       }
       setCrops(cropsList);
@@ -200,7 +213,7 @@ const Web3FarmerComponent = ({ web3Instance, account, contract, connectWallet, d
   );
 };
 
-const CropDetailsPage = ({ web3Instance, contract }) => {
+const CropDetailsPage = ({ provider, contract }) => {
   const { cropId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -209,72 +222,83 @@ const CropDetailsPage = ({ web3Instance, contract }) => {
   const [cropDetails, setCropDetails] = useState(null);
 
   useEffect(() => {
-    if (contract) {
-      fetchDetails();
-    } else {
-      initPublicWeb3AndFetchDetails();
-    }
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        let contractInstance;
+
+        if (contract) {
+          contractInstance = contract;
+        } else {
+          // Create read-only contract instance with Alchemy provider
+          const alchemyProvider = new ethers.providers.JsonRpcProvider(ALCHEMY_RPC);
+          contractInstance = new ethers.Contract(contractAddress, contractABI, alchemyProvider);
+        }
+
+        const [farmerId, actualCropId] = cropId.split('-').map(Number);
+
+        const farmer = await contractInstance.farmers(farmerId);
+        
+        if (!farmer || farmer.farmerId.toString() === '0') {
+          throw new Error("Farmer not found");
+        }
+
+        setFarmerDetails({
+          id: farmer.farmerId.toString(),
+          name: farmer.name,
+          cropCount: farmer.cropCount.toString()
+        });
+
+        const crop = await contractInstance.getCrop(farmerId, actualCropId);
+        
+        if (!crop || crop[0].toString() === '0') {
+          throw new Error("Crop not found");
+        }
+
+        setCropDetails({
+          cropId: crop[0].toString(),
+          cropName: crop[1],
+          quantity: crop[2].toString()
+        });
+
+        setError('');
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError(err.message || "Failed to fetch details from blockchain");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [cropId, contract]);
-
-  const initPublicWeb3AndFetchDetails = async () => {
-    try {
-      // Use a public RPC endpoint for read-only access
-      const publicWeb3 = new Web3('https://eth-mainnet.g.alchemy.com/v2/your-api-key'); // Replace with your public RPC endpoint
-      const publicContract = new publicWeb3.eth.Contract(contractABI, contractAddress);
-      await fetchDetails(publicContract);
-    } catch (error) {
-      setError('Failed to connect to blockchain');
-      setLoading(false);
-    }
-  };
-
-  const fetchDetails = async (contractInstance = contract) => {
-    try {
-      const [farmerId, actualCropId] = cropId.split('-').map(Number);
-      
-      // Fetch farmer details
-      const farmer = await contractInstance.methods.farmers(farmerId).call();
-      setFarmerDetails({
-        id: farmer.farmerId,
-        name: farmer.name,
-        cropCount: farmer.cropCount
-      });
-
-      // Fetch specific crop details
-      const crop = await contractInstance.methods.getCrop(farmerId, actualCropId).call();
-      setCropDetails({
-        cropId: crop[0],
-        cropName: crop[1],
-        quantity: crop[2]
-      });
-    } catch (error) {
-      setError("Failed to fetch details from blockchain");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
         <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
-          <p className="text-purple-400">Loading details from blockchain...</p>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
+            <p className="text-purple-400">Loading details from blockchain...</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (error || !farmerDetails || !cropDetails) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
         <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
-          <p className="text-red-400">{error || "Failed to fetch details from blockchain"}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-          >
-            Back to Main Page
-          </button>
+          <div className="text-center">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+            >
+              Back to Main Page
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -284,52 +308,75 @@ const CropDetailsPage = ({ web3Instance, contract }) => {
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
       <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
         <h1 className="text-3xl font-bold mb-6 text-center text-purple-400">Authenticated Crop Details</h1>
+        
         <div className="bg-gray-700 p-4 rounded mb-6">
-          <p className="text-green-400 font-semibold">✓ Blockchain Verified Data</p>
+          <p className="text-green-400 font-semibold flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Blockchain Verified Data
+          </p>
         </div>
+
         <div className="bg-gray-700 p-4 rounded mb-6">
           <h2 className="text-xl font-semibold mb-2 text-purple-400">Farmer Information</h2>
-          <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
-          <p><strong>Farmer Name:</strong> {farmerDetails.name}</p>
+          <p><strong>Farmer ID:</strong> {farmerDetails?.id}</p>
+          <p><strong>Farmer Name:</strong> {farmerDetails?.name}</p>
         </div>
-        <div className="bg-gray-700 p-4 rounded">
+
+        <div className="bg-gray-700 p-4 rounded mb-6">
           <h2 className="text-xl font-semibold mb-2 text-purple-400">Crop Information</h2>
-          <p><strong>Crop ID:</strong> {cropDetails.cropId.toString()}</p>
-          <p><strong>Crop Name:</strong> {cropDetails.cropName}</p>
-          <p><strong>Quantity:</strong> {cropDetails.quantity.toString()}</p>
+          <p><strong>Crop ID:</strong> {cropDetails?.cropId}</p>
+          <p><strong>Crop Name:</strong> {cropDetails?.cropName}</p>
+          <p><strong>Quantity:</strong> {cropDetails?.quantity}</p>
         </div>
-        <button
-          onClick={() => navigate('/')}
-          className="mt-6 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-        >
-          Back to Main Page
-        </button>
+
+        <div className="flex justify-between items-center">
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+          >
+            Back to Main Page
+          </button>
+          <QRCodeSVG
+            value={`${window.location.origin}/crop/${cropId}`}
+            size={128}
+            level="H"
+            includeMargin={true}
+            className="bg-white p-2 rounded"
+          />
+        </div>
       </div>
     </div>
   );
 };
 
 const App = () => {
-  const [web3Instance, setWeb3] = useState(null);
-  const [account, setAccount] = useState('');
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
 
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
-        const web3Instance = new Web3(window.ethereum);
-        await window.ethereum.enable();
-        const accounts = await web3Instance.eth.getAccounts();
-        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
+        // Request account access
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
         
-        setWeb3(web3Instance);
-        setAccount(accounts[0]);
+        // Create provider and signer (ethers v6 syntax)
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        
+        // Create contract instance
+        const contractInstance = new ethers.Contract(contractAddress, contractABI, provider);
+        
+        setProvider(provider);
+        setSigner(signer);
         setContract(contractInstance);
 
         // Add event listener for account changes
         window.ethereum.on('accountsChanged', handleAccountsChanged);
       } catch (error) {
-        console.error("Failed to connect to MetaMask");
+        console.error("Failed to connect to MetaMask:", error);
       }
     } else {
       console.error("Please install MetaMask");
@@ -337,10 +384,9 @@ const App = () => {
   };
 
   const disconnectWallet = () => {
-    setWeb3(null);
-    setAccount('');
+    setProvider(null);
+    setSigner(null);
     setContract(null);
-    // Remove event listener
     if (window.ethereum) {
       window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
     }
@@ -348,11 +394,9 @@ const App = () => {
 
   const handleAccountsChanged = (accounts) => {
     if (accounts.length === 0) {
-      // User disconnected their wallet
       disconnectWallet();
     } else {
-      // User switched accounts
-      setAccount(accounts[0]);
+      connectWallet(); // Reconnect with new account
     }
   };
 
@@ -368,8 +412,21 @@ const App = () => {
         .catch(console.error);
     }
 
+    // Initialize read-only provider for users without MetaMask (ethers v6 syntax)
+    const initializeReadOnlyProvider = async () => {
+      try {
+        const alchemyProvider = new ethers.JsonRpcProvider(ALCHEMY_RPC);
+        const contractInstance = new ethers.Contract(contractAddress, contractABI, alchemyProvider);
+        setProvider(alchemyProvider);
+        setContract(contractInstance);
+      } catch (error) {
+        console.error("Failed to initialize read-only provider:", error);
+      }
+    };
+
+    initializeReadOnlyProvider();
+
     return () => {
-      // Cleanup event listeners
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
@@ -397,8 +454,8 @@ const App = () => {
             path="/" 
             element={
               <Web3FarmerComponent 
-                web3Instance={web3Instance}
-                account={account}
+                provider={provider}
+                signer={signer}
                 contract={contract}
                 connectWallet={connectWallet}
                 disconnectWallet={disconnectWallet}
@@ -409,8 +466,8 @@ const App = () => {
             path="/dashboard" 
             element={
               <Dashboard 
-                web3Instance={web3Instance}
-                account={account}
+                provider={provider}
+                signer={signer}
                 contract={contract}
                 connectWallet={connectWallet}
                 disconnectWallet={disconnectWallet}
@@ -421,7 +478,7 @@ const App = () => {
             path="/crop/:cropId" 
             element={
               <CropDetailsPage 
-                web3Instance={web3Instance}
+                provider={provider}
                 contract={contract}
               />
             } 
