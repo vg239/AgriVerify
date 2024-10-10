@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Link, useParams, useNavigate } 
 import Web3 from 'web3';
 import { QRCodeSVG } from 'qrcode.react';
 import contractABI from './abi.json';
+import Dashboard from './Dashboard';
 import './App.css';
 
 const contractAddress = "0x95f26527FC4b8E1bAE276Ec52056bc4A420dC0E8";
@@ -321,12 +322,72 @@ const CropDetailsPage = () => {
 };
 
 const App = () => {
+  const [web3Instance, setWeb3] = useState(null);
+  const [account, setAccount] = useState('');
+  const [contract, setContract] = useState(null);
+
+  useEffect(() => {
+    initWeb3();
+  }, []);
+
+  const initWeb3 = async () => {
+    if (window.ethereum) {
+      const web3Instance = new Web3(window.ethereum);
+      setWeb3(web3Instance);
+      try {
+        await window.ethereum.enable();
+        const accounts = await web3Instance.eth.getAccounts();
+        setAccount(accounts[0]);
+        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
+        setContract(contractInstance);
+      } catch (error) {
+        console.error("Failed to connect to MetaMask");
+      }
+    } else {
+      console.error("Please install MetaMask");
+    }
+  };
+
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Web3FarmerComponent />} />
-        <Route path="/crop/:cropId" element={<CropDetailsPage />} />
-      </Routes>
+      <div className="min-h-screen bg-gray-900">
+        <nav className="bg-gray-800 p-4">
+          <div className="max-w-4xl mx-auto flex justify-center space-x-6">
+            <Link to="/" className="text-purple-400 hover:text-purple-300">
+              Manage Farmers
+            </Link>
+            <Link to="/dashboard" className="text-purple-400 hover:text-purple-300">
+              Dashboard
+            </Link>
+          </div>
+        </nav>
+
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              <Web3FarmerComponent 
+                web3Instance={web3Instance}
+                account={account}
+                contract={contract}
+                contractAddress={contractAddress}
+              />
+            } 
+          />
+          <Route 
+            path="/dashboard" 
+            element={
+              <Dashboard 
+                web3Instance={web3Instance}
+                account={account}
+                contract={contract}
+                contractAddress={contractAddress}
+              />
+            } 
+          />
+          <Route path="/crop/:cropId" element={<CropDetailsPage />} />
+        </Routes>
+      </div>
     </Router>
   );
 };
