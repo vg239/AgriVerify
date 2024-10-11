@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import { Search } from 'lucide-react';
+import contractABI from './abi.json';
+import Web3 from 'web3';
 
-const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
+const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
+
+const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
   const [farmers, setFarmers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,6 +16,9 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
   useEffect(() => {
     if (contract && account) {
       fetchAllFarmers();
+    } else {
+      setError('Please connect your MetaMask wallet to view the dashboard.');
+      setLoading(false);
     }
   }, [contract, account]);
 
@@ -33,21 +39,23 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
         for (let j = 1; j <= farmer.cropCount; j++) {
           const crop = await contract.methods.getCrop(i, j).call();
           crops.push({
-            cropId: crop[0],
+            cropId: Number(crop[0]),
             cropName: crop[1],
-            quantity: crop[2]
+            price: Number(crop[2]),
+            ipfsHash: crop[3]
           });
         }
 
         farmersData.push({
-          id: farmer.farmerId,
+          id: Number(farmer.farmerId),
           name: farmer.name,
-          cropCount: farmer.cropCount,
+          cropCount: Number(farmer.cropCount),
           crops: crops
         });
       }
 
       setFarmers(farmersData);
+      setFilteredFarmers(farmersData);
       setError('');
     } catch (err) {
       setError('Failed to fetch farmers data');
@@ -69,24 +77,27 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
     setFilteredFarmers(filtered);
   };
 
-  if (!account) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-gray-100">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="bg-gray-800 p-6 rounded">
-            <p className="text-red-400">Please connect your MetaMask wallet to view the dashboard.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100">
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-gray-800 p-6 rounded">
             <p className="text-purple-400">Loading farmer data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!account) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-100">
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-gray-800 p-6 rounded">
+            <p className="text-red-400">{error}</p>
+            <button onClick={onConnect} className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+              Connect Wallet
+            </button>
           </div>
         </div>
       </div>
@@ -119,8 +130,6 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
           )}
         </div>
 
-        {error && <p className="text-red-400 mb-4">{error}</p>}
-
         {farmers.length === 0 ? (
           <div className="bg-gray-800 p-6 rounded">
             <p className="text-center">No farmers registered yet.</p>
@@ -131,44 +140,25 @@ const Dashboard = ({ web3Instance, account, contract, contractAddress }) => {
               <div key={farmer.id} className="bg-gray-800 p-6 rounded transition-all duration-300 hover:bg-gray-750">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-2xl font-semibold text-purple-400">
-                      Farmer: {farmer.name}
-                    </h2>
+                    <h2 className="text-2xl font-semibold text-purple-400">Farmer: {farmer.name}</h2>
                     <p className="text-gray-300">Farmer ID: {farmer.id.toString()}</p>
                     <p className="text-gray-300">Total Crops: {farmer.cropCount.toString()}</p>
                   </div>
                 </div>
 
                 <div className="space-y-4 mt-6">
-                  <h3 className="text-xl font-semibold text-purple-400 border-b border-gray-700 pb-2">
-                    Crops
-                  </h3>
+                  <h3 className="text-xl font-semibold text-purple-400 border-b border-gray-700 pb-2">Crops</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {farmer.crops.map((crop) => (
-                      <div 
-                        key={`${farmer.id}-${crop.cropId}`} 
-                        className="bg-gray-700 p-4 rounded hover:bg-gray-650 transition-colors"
-                      >
+                      <div key={`${farmer.id}-${crop.cropId}`} 
+                           className="bg-gray-700 p-4 rounded hover:bg-gray-650 transition-colors">
                         <p className="font-semibold text-purple-300">Crop #{crop.cropId.toString()}</p>
                         <p><strong>Name:</strong> {crop.cropName}</p>
-                        <p><strong>Quantity:</strong> {crop.quantity.toString()}</p>
-                        <div className="mt-4">
-                          <Link 
-                            to={`/crop/${farmer.id}-${crop.cropId}`}
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            View Details
-                          </Link>
-                          <div className="mt-2">
-                            <QRCodeSVG
-                              value={`${window.location.origin}/crop/${farmer.id}-${crop.cropId}`}
-                              size={128}
-                              level="H"
-                              includeMargin={true}
-                              className="bg-white p-2 rounded"
-                            />
-                          </div>
-                        </div>
+                        <p><strong>Price:</strong> {crop.price.toString()}</p>
+                        <Link to={`/crop/${farmer.id}-${crop.cropId}`} 
+                              className="text-blue-400 hover:text-blue-300 transition-colors mt2 inline-block">
+                          View Details
+                        </Link>
                       </div>
                     ))}
                   </div>

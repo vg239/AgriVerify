@@ -11,20 +11,6 @@ const ALCHEMY_RPC = "https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1
 
 const publicWeb3 = new Web3(new Web3.providers.HttpProvider(ALCHEMY_RPC));
 
-// Updated QR code generation function using qrcode library
-const generateQRCodeDataUrl = async (url) => {
-  try {
-    const qrCodeDataUrl = await QRCode.toDataURL(url, {
-      width: 1024,
-      margin: 1,
-      errorCorrectionLevel: 'H'
-    });
-    return qrCodeDataUrl;
-  } catch (error) {
-    console.error('Error generating QR code:', error);
-    throw new Error('Failed to generate QR code');
-  }
-};
 // Updated IPFS upload function with proper error handling and authentication
 const pinJSONToIPFS = async (jsonData) => {
   const url = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
@@ -121,6 +107,7 @@ const Web3FarmerComponent = () => {
       setError("Please install MetaMask");
     }
   };
+
   const disconnectWallet = () => {
     setWeb3(null);
     setAccount('');
@@ -138,7 +125,7 @@ const Web3FarmerComponent = () => {
     try {
       await contract.methods.addFarmer(farmerName).send({ from: account });
       const farmerCount = await contract.methods.farmerCount().call();
-      const farmerCountNumber = Number(farmerCount); // Convert BigInt to Number
+      const farmerCountNumber = Number(farmerCount);
       setCurrentFarmerId(farmerCountNumber);
       setFarmerName('');
       setCrops([]);
@@ -160,10 +147,13 @@ const Web3FarmerComponent = () => {
       const nextCropId = Number(farmerDetails?.cropCount) + 1 || 1;
       const qrCodeUrl = `${window.location.origin}/crop/${currentFarmerId}-${nextCropId}`;
       
-      // Generate QR code data URL using updated function
-      const qrCodeDataUrl = await generateQRCodeDataUrl(qrCodeUrl);
-      console.log('QR Code generated successfully');
-  
+      // Generate QR code data URL using qrcode library
+      const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, {
+        width: 1024,
+        margin: 1,
+        errorCorrectionLevel: 'H'
+      });
+      
       const metadata = generateNFTMetadata(
         { 
           cropId: nextCropId,
@@ -324,6 +314,12 @@ const Web3FarmerComponent = () => {
                 <p><strong>Crop ID:</strong> {crop.cropId}</p>
                 <p><strong>Name:</strong> {crop.cropName}</p>
                 <p><strong>Quantity:</strong> {crop.quantity}</p>
+                <Link
+                  to={`/crop/${farmerDetails.id}-${crop.cropId}`}
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  View Details
+                </Link>
               </div>
             ))}
           </div>
@@ -332,60 +328,7 @@ const Web3FarmerComponent = () => {
     </div>
   );
 };
-const addCrop = async () => {
-  setError('');
-  if (!contract || !account) return setError('Please connect your wallet first');
-  if (!currentFarmerId) return setError('Please create or select a farmer first');
-  if (!cropName || !quantity) return setError('Please fill in all crop details');
 
-  try {
-    setMinting(true);
-
-    // Generate QR code URL
-    const nextCropId = Number(farmerDetails?.cropCount) + 1 || 1;
-    const qrCodeUrl = `${window.location.origin}/crop/${currentFarmerId}-${nextCropId}`;
-    
-    // Create QR code data URL using QRCodeSVG
-    const qrCodeElement = document.createElement('div');
-    ReactDOM.render(
-      <QRCodeSVG
-        value={qrCodeUrl}
-        size={1024}
-        level="H"
-        includeMargin={true}
-      />,
-      qrCodeElement
-    );
-    
-    // Convert SVG to data URL
-    const svgString = qrCodeElement.innerHTML;
-    const qrCodeDataUrl = `data:image/svg+xml;base64,${btoa(svgString)}`;
-
-    const metadata = generateNFTMetadata(
-      { 
-        cropId: nextCropId,
-        cropName, 
-        quantity 
-      },
-      qrCodeDataUrl,
-      currentFarmerId
-    );
-
-    const ipfsHash = await pinJSONToIPFS(metadata);
-    console.log('IPFS Hash:', ipfsHash);
-
-    await contract.methods.addCrop(currentFarmerId, cropName, quantity, ipfsHash)
-      .send({ from: account });
-
-    setCropName('');
-    setQuantity('');
-    fetchFarmerDetails(currentFarmerId);
-  } catch (error) {
-    setError(`Failed to add crop and mint NFT: ${error.message}`);
-  } finally {
-    setMinting(false);
-  }
-};
 const CropDetailsPage = () => {
   const { cropId } = useParams();
   const navigate = useNavigate();
@@ -433,7 +376,7 @@ const CropDetailsPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
-        <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
+        <div className="max-w-2xl  mx-auto bg-gray-800 p-6 rounded">
           <p className="text-purple-400">Loading details from blockchain...</p>
         </div>
       </div>
@@ -472,7 +415,7 @@ const CropDetailsPage = () => {
           <h2 className="text-xl font-semibold mb-2 text-purple-400">Crop Information</h2>
           <p><strong>Crop ID:</strong> {cropDetails.cropId.toString()}</p>
           <p><strong>Crop Name:</strong> {cropDetails.cropName}</p>
-          <p><strong>Price:</strong> {cropDetails.quantity.toString()}</p>
+          <p><strong>Quantity:</strong> {cropDetails.quantity.toString()}</p>
         </div>
         <button
           onClick={() => navigate('/')}
@@ -486,6 +429,28 @@ const CropDetailsPage = () => {
 };
 
 const App = () => {
+  const [web3Instance, setWeb3] = useState(null);
+  const [account, setAccount] = useState('');
+  const [contract, setContract] = useState(null);
+
+  const initWeb3 = async () => {
+    if (window.ethereum) {
+      const web3Instance = new Web3(window.ethereum);
+      setWeb3(web3Instance);
+      try {
+        await window.ethereum.enable();
+        const accounts = await web3Instance.eth.getAccounts();
+        setAccount(accounts[0]);
+        const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
+        setContract(contractInstance);
+      } catch (error) {
+        console.error("Failed to connect to MetaMask", error);
+      }
+    } else {
+      console.error("Please install MetaMask");
+    }
+  };
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-900">
@@ -502,7 +467,14 @@ const App = () => {
 
         <Routes>
           <Route path="/" element={<Web3FarmerComponent />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={
+            <Dashboard 
+              web3Instance={web3Instance} 
+              account={account} 
+              contract={contract} 
+              onConnect={initWeb3}
+            />
+          } />
           <Route path="/crop/:cropId" element={<CropDetailsPage />} />
         </Routes>
       </div>
