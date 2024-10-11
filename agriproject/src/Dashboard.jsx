@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
-import contractABI from './abi.json';
-import Web3 from 'web3';
+import { Search, User } from 'lucide-react';
 import QRCode from 'qrcode';
 
 const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
@@ -30,6 +28,7 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
   const [error, setError] = useState('');
   const [searchId, setSearchId] = useState('');
   const [filteredFarmers, setFilteredFarmers] = useState([]);
+  const [showOnlyUserFarmers, setShowOnlyUserFarmers] = useState(false);
 
   useEffect(() => {
     if (contract && account) {
@@ -42,7 +41,7 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
 
   useEffect(() => {
     filterFarmers();
-  }, [searchId, farmers]);
+  }, [searchId, farmers, showOnlyUserFarmers]);
 
   const fetchAllFarmers = async () => {
     try {
@@ -58,12 +57,15 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
           const crop = await contract.methods.getCrop(i, j).call();
           const qrCodeUrl = `${window.location.origin}/crop/${i}-${j}`;
           const qrCodeDataUrl = await generateQRCode(qrCodeUrl);
+          const cropOwner = await contract.methods.ownerOfCropNFT(i, j).call();
           crops.push({
             cropId: Number(crop[0]),
             cropName: crop[1],
-            price: Number(crop[2]),
-            ipfsHash: crop[3],
-            qrCodeDataUrl: qrCodeDataUrl
+            quantity: Number(crop[2]),
+            nftTokenId: Number(crop[3]),
+            ipfsHash: crop[4],
+            qrCodeDataUrl: qrCodeDataUrl,
+            owner: cropOwner
           });
         }
 
@@ -71,7 +73,8 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
           id: Number(farmer.farmerId),
           name: farmer.name,
           cropCount: Number(farmer.cropCount),
-          crops: crops
+          crops: crops,
+          owner: crops.length > 0 ? crops[0].owner : null
         });
       }
 
@@ -87,14 +90,18 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
   };
 
   const filterFarmers = () => {
-    if (!searchId.trim()) {
-      setFilteredFarmers(farmers);
-      return;
+    let filtered = farmers;
+
+    if (showOnlyUserFarmers) {
+      filtered = filtered.filter(farmer => farmer.owner && farmer.owner.toLowerCase() === account.toLowerCase());
     }
 
-    const filtered = farmers.filter(farmer => 
-      farmer.id.toString().includes(searchId.trim())
-    );
+    if (searchId.trim()) {
+      filtered = filtered.filter(farmer => 
+        farmer.id.toString().includes(searchId.trim())
+      );
+    }
+
     setFilteredFarmers(filtered);
   };
 
@@ -134,20 +141,35 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
           <p className="text-green-400">Connected Wallet: {account}</p>
         </div>
 
-        {/* Search Box */}
+        {/* Search and Filter Controls */}
         <div className="mb-6 bg-gray-800 p-4 rounded">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by Farmer ID..."
-              value={searchId}
-              onChange={(e) => setSearchId(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <div className="relative flex-grow mr-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search by Farmer ID..."
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="showOnlyUserFarmers"
+                checked={showOnlyUserFarmers}
+                onChange={(e) => setShowOnlyUserFarmers(e.target.checked)}
+                className="mr-2"
+              />
+              <label htmlFor="showOnlyUserFarmers" className="text-sm text-gray-300 flex items-center">
+                <User size={16} className="mr-1" />
+                My Farmers
+              </label>
+            </div>
           </div>
-          {filteredFarmers.length === 0 && searchId && (
-            <p className="mt-2 text-yellow-400">No farmers found with ID: {searchId}</p>
+          {filteredFarmers.length === 0 && (searchId || showOnlyUserFarmers) && (
+            <p className="mt-2 text-yellow-400">No farmers found with the current filters.</p>
           )}
         </div>
 
@@ -164,6 +186,7 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
                     <h2 className="text-2xl font-semibold text-purple-400">Farmer: {farmer.name}</h2>
                     <p className="text-gray-300">Farmer ID: {farmer.id.toString()}</p>
                     <p className="text-gray-300">Total Crops: {farmer.cropCount.toString()}</p>
+                    <p className="text-gray-300">Owner: {farmer.owner}</p>
                   </div>
                 </div>
 
@@ -175,7 +198,8 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
                            className="bg-gray-700 p-4 rounded hover:bg-gray-650 transition-colors">
                         <p className="font-semibold text-purple-300">Crop #{crop.cropId.toString()}</p>
                         <p><strong>Name:</strong> {crop.cropName}</p>
-                        <p><strong>Price:</strong> {crop.price.toString()}</p>
+                        <p><strong>Quantity:</strong> {crop.quantity.toString()}</p>
+                        <p><strong>NFT Token ID:</strong> {crop.nftTokenId.toString()}</p>
                         <img src={crop.qrCodeDataUrl} alt={`QR Code for Crop ${crop.cropId}`} className="my-2 w-32 h-32" />
                         <Link to={`/crop/${farmer.id}-${crop.cropId}`} 
                               className="text-blue-400 hover:text-blue-300 transition-colors mt-2 inline-block">
