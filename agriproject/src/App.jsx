@@ -69,6 +69,23 @@ const generateNFTMetadata = (cropData, qrCodeDataUrl, farmerId) => {
   };
 };
 
+const generateQRCode = async (url) => {
+  try {
+    const qrCodeDataUrl = await QRCode.toDataURL(url, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw new Error('Failed to generate QR code');
+  }
+};
+
 const Web3FarmerComponent = () => {
   const [web3Instance, setWeb3] = useState(null);
   const [account, setAccount] = useState('');
@@ -147,12 +164,8 @@ const Web3FarmerComponent = () => {
       const nextCropId = Number(farmerDetails?.cropCount) + 1 || 1;
       const qrCodeUrl = `${window.location.origin}/crop/${currentFarmerId}-${nextCropId}`;
       
-      // Generate QR code data URL using qrcode library
-      const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, {
-        width: 1024,
-        margin: 1,
-        errorCorrectionLevel: 'H'
-      });
+      // Generate QR code data URL
+      const qrCodeDataUrl = await generateQRCode(qrCodeUrl);
       
       const metadata = generateNFTMetadata(
         { 
@@ -206,10 +219,13 @@ const Web3FarmerComponent = () => {
       const cropsList = [];
       for (let i = 1; i <= Number(farmer.cropCount); i++) {
         const crop = await contractToUse.methods.getCrop(farmerId, i).call();
+        const qrCodeUrl = `${window.location.origin}/crop/${farmerId}-${i}`;
+        const qrCodeDataUrl = await generateQRCode(qrCodeUrl);
         cropsList.push({
           cropId: Number(crop[0]),
           cropName: crop[1],
-          quantity: Number(crop[2])
+          quantity: Number(crop[2]),
+          qrCodeDataUrl: qrCodeDataUrl
         });
       }
       setCrops(cropsList);
@@ -314,6 +330,7 @@ const Web3FarmerComponent = () => {
                 <p><strong>Crop ID:</strong> {crop.cropId}</p>
                 <p><strong>Name:</strong> {crop.cropName}</p>
                 <p><strong>Quantity:</strong> {crop.quantity}</p>
+                <img src={crop.qrCodeDataUrl} alt={`QR Code for Crop ${crop.cropId}`} className="my-2 w-32 h-32" />
                 <Link
                   to={`/crop/${farmerDetails.id}-${crop.cropId}`}
                   className="text-blue-400 hover:text-blue-300"
@@ -338,6 +355,7 @@ const CropDetailsPage = () => {
   const [error, setError] = useState('');
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [cropDetails, setCropDetails] = useState(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState(null);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -346,7 +364,7 @@ const CropDetailsPage = () => {
         
         const farmer = await publicContract.methods.farmers(farmerId).call();
         setFarmerDetails({
-          id: Number(farmer.farmerId),
+          id:  Number(farmer.farmerId),
           name: farmer.name,
           cropCount: Number(farmer.cropCount)
         });
@@ -357,6 +375,10 @@ const CropDetailsPage = () => {
           cropName: crop[1],
           quantity: Number(crop[2])
         });
+
+        const qrCodeUrl = `${window.location.origin}/crop/${farmerId}-${actualCropId}`;
+        const qrCode = await generateQRCode(qrCodeUrl);
+        setQrCodeDataUrl(qrCode);
       } catch (error) {
         console.error("Fetch error:", error);
         setError("Failed to fetch details from blockchain. Please check if the provided IDs are correct.");
@@ -376,7 +398,7 @@ const CropDetailsPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
-        <div className="max-w-2xl  mx-auto bg-gray-800 p-6 rounded">
+        <div className="max-w-2xl mx-auto bg-gray-800 p-6 rounded">
           <p className="text-purple-400">Loading details from blockchain...</p>
         </div>
       </div>
@@ -411,11 +433,15 @@ const CropDetailsPage = () => {
           <p><strong>Farmer ID:</strong> {farmerDetails.id.toString()}</p>
           <p><strong>Farmer Name:</strong> {farmerDetails.name}</p>
         </div>
-        <div className="bg-gray-700 p-4 rounded">
+        <div className="bg-gray-700 p-4 rounded mb-6">
           <h2 className="text-xl font-semibold mb-2 text-purple-400">Crop Information</h2>
           <p><strong>Crop ID:</strong> {cropDetails.cropId.toString()}</p>
           <p><strong>Crop Name:</strong> {cropDetails.cropName}</p>
           <p><strong>Quantity:</strong> {cropDetails.quantity.toString()}</p>
+        </div>
+        <div className="bg-gray-700 p-4 rounded mb-6">
+          <h2 className="text-xl font-semibold mb-2 text-purple-400">QR Code</h2>
+          <img src={qrCodeDataUrl} alt="Crop QR Code" className="w-48 h-48 mx-auto" />
         </div>
         <button
           onClick={() => navigate('/')}

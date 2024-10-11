@@ -3,8 +3,26 @@ import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import contractABI from './abi.json';
 import Web3 from 'web3';
+import QRCode from 'qrcode';
 
 const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
+
+const generateQRCode = async (url) => {
+  try {
+    const qrCodeDataUrl = await QRCode.toDataURL(url, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw new Error('Failed to generate QR code');
+  }
+};
 
 const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
   const [farmers, setFarmers] = useState([]);
@@ -38,11 +56,14 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
 
         for (let j = 1; j <= farmer.cropCount; j++) {
           const crop = await contract.methods.getCrop(i, j).call();
+          const qrCodeUrl = `${window.location.origin}/crop/${i}-${j}`;
+          const qrCodeDataUrl = await generateQRCode(qrCodeUrl);
           crops.push({
             cropId: Number(crop[0]),
             cropName: crop[1],
             price: Number(crop[2]),
-            ipfsHash: crop[3]
+            ipfsHash: crop[3],
+            qrCodeDataUrl: qrCodeDataUrl
           });
         }
 
@@ -155,8 +176,9 @@ const Dashboard = ({ web3Instance, account, contract, onConnect }) => {
                         <p className="font-semibold text-purple-300">Crop #{crop.cropId.toString()}</p>
                         <p><strong>Name:</strong> {crop.cropName}</p>
                         <p><strong>Price:</strong> {crop.price.toString()}</p>
+                        <img src={crop.qrCodeDataUrl} alt={`QR Code for Crop ${crop.cropId}`} className="my-2 w-32 h-32" />
                         <Link to={`/crop/${farmer.id}-${crop.cropId}`} 
-                              className="text-blue-400 hover:text-blue-300 transition-colors mt2 inline-block">
+                              className="text-blue-400 hover:text-blue-300 transition-colors mt-2 inline-block">
                           View Details
                         </Link>
                       </div>
