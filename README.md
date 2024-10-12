@@ -107,4 +107,5 @@ IPFS hashes can be stored with each crop for off-chain data storage.
 #### iv) IPFS
 - `pinJSONToIPFS()`: Uploads metadata to IPFS using Pinata
 
-
+<a href="https://drive.google.com/file/d/1FTuw8QVW2Xqq7v_0-RXQbIshuMYnjqIa/view?usp=drive_link"><h3>DEMO VIDEO</h3></a>
+<a href="https://agri-verify-lake.vercel.app/"><h3>LIVE VIDEO</h3></a>
