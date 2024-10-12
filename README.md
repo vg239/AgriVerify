@@ -1,6 +1,9 @@
 # AgriVerify
 
 LIVE WEBSITE : https://agri-verify-lake.vercel.app
+<br>
+<br>
+The demo video for the given website explaining all the features and the functionalities is : 
 [DEMO VIDEO](https://drive.google.com/file/d/1FTuw8QVW2Xqq7v_0-RXQbIshuMYnjqIa/view?usp=drive_link)
 
 This is a decentralized website that helps farmers to easily certify their produced crops and generate QR codes that consumers can scan for instant verification. A NFT is minted for every generated QR-code to ensure authenticity. For every process as the farmers add their name to adding their crops, notifications are sent containing the important info using the Push Protocol. In short, this project implements a FarmManagement smart contract for managing farmers and crops as NFTs.
