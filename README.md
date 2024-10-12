@@ -74,6 +74,8 @@ IPFS hashes can be stored with each crop for off-chain data storage.
    - View all registered farmers
    - Search functionality to find specific farmers
    - Display crop details for each farmer
+   - Radio button to filter out all farmers created by you
+   - Complete transperency of blockchain
 
 4. **Blockchain Integration**
    - Interaction with a smart contract deployed on the Sepolia testnet
@@ -104,3 +106,5 @@ IPFS hashes can be stored with each crop for off-chain data storage.
 
 #### iv) IPFS
 - `pinJSONToIPFS()`: Uploads metadata to IPFS using Pinata
+
+
