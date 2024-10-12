@@ -212,6 +212,7 @@ const Web3FarmerComponent = () => {
       setCropName('');
       setQuantity('');
       fetchFarmerDetails(currentFarmerId);
+      await sendNotificationForCropAdded(currentFarmerId,cropName, quantity,ipfsHash,qrCodeUrl)
     } catch (error) {
       console.error('Full error:', error);
       setError(`Failed to add crop and mint NFT: ${error.message}`);
@@ -276,6 +277,37 @@ const Web3FarmerComponent = () => {
       }
     }
   }
+
+  const sendNotificationForCropAdded = async (currentFarmerId,cropName, quantity,ipfsHash,qrCodeUrl) => {
+    if(!ethersSigner){
+      console.error('Ether Signer is not initialized')
+    }
+    else{
+      try {
+        const userSigner = await PushAPI.initialize(ethersSigner, {
+          env: CONSTANTS.ENV.STAGING,
+        });
+        console.log(userSigner.account)
+  
+        const subscribeStatus = await userSigner.notification.subscribe(channelInCAIP);
+        console.log(subscribeStatus)
+    
+        // Sending notification using the userSigner with the correct syntax
+        const sendNotifRes = await userSigner.channel.send([`${userSigner.account}`], {
+          notification: { title: `New Crop Added : ${cropName} and certified for Farmer ID ${currentFarmerId}`, body: `${quantity} is the given amount of crops which have been added. We have also created a qr code for you to show your authenticity which has the following hash ${ipfsHash}`},
+          }
+        );
+        console.log(sendNotifRes)
+  
+  
+        console.log('Notification sent:', sendNotifRes);
+      } catch (error) {
+        console.error('Error sending notification:', error);
+      }
+    }
+    
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
