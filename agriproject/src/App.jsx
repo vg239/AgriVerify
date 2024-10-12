@@ -8,9 +8,10 @@ import './App.css';
 import { ethers } from 'ethers';
 import { PushAPI, CONSTANTS } from '@pushprotocol/restapi';
 
-const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
+const contractAddress = "0xEe4F162B6b261Bc6260D70b2785431B3e44136B1"; //the new contract after compilation from hardhat and testing using hardhat
+//this is deployed on sepolia testnet 
 const ALCHEMY_RPC = "https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1AbmHhRhAtH";
-const channelInCAIP = "eip155:11155111:0x210406844A1B98EF2729398c4BF9700238fF0a76"
+const channelInCAIP = "eip155:11155111:0x210406844A1B98EF2729398c4BF9700238fF0a76" //this is the channel in the caip format through which notifcations are being sent 
 
 const publicWeb3 = new Web3(new Web3.providers.HttpProvider(ALCHEMY_RPC));
 
