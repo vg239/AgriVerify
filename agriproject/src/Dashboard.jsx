@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, User } from 'lucide-react';
 import QRCode from 'qrcode';
 
-const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
+const contractAddress = "0xEe4F162B6b261Bc6260D70b2785431B3e44136B1";
 
 const generateQRCode = async (url) => {
   try {
