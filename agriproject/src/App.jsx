@@ -107,11 +107,11 @@ const Web3FarmerComponent = () => {
   const [farmerDetails, setFarmerDetails] = useState(null);
   const [crops, setCrops] = useState([]);
   const [minting, setMinting] = useState(false);
-
+// set all initail states for the variables that are going to be used in the application
   useEffect(() => {
     const publicContractInstance = new publicWeb3.eth.Contract(contractABI, contractAddress);
     setPublicContract(publicContractInstance);
-  }, []);
+  }, []);//interacting with the blockchain without requiring a wallet connection.
 
   const initWeb3 = async () => {
     if (window.ethereum) {
@@ -147,7 +147,7 @@ const Web3FarmerComponent = () => {
     setFarmerDetails(null);
     setCrops([]);
   };
-
+//disconnect wallet
   const addFarmer = async () => {
     setError('');
     if (!contract || !account) return setError('Please connect your wallet first');
@@ -166,7 +166,7 @@ const Web3FarmerComponent = () => {
       setError(`Failed to add farmer: ${error.message}`);
     }
   };
-
+//adding a crop
   const addCrop = async () => {
     setError('');
     if (!contract || !account) return setError('Please connect your wallet first');
@@ -196,7 +196,7 @@ const Web3FarmerComponent = () => {
       let ipfsHash;
       try {
         ipfsHash = await pinJSONToIPFS(metadata);
-        console.log('IPFS Hash:', ipfsHash);
+        console.log('IPFS Hash:', ipfsHash);//logging the hash of the ipfs
       } catch (ipfsError) {
         console.error('IPFS Upload Error:', ipfsError);
         throw new Error(`IPFS Upload failed: ${ipfsError.message}`);
@@ -221,7 +221,7 @@ const Web3FarmerComponent = () => {
       setMinting(false);
     }
   };
-  
+  //adding a crop 
   const fetchFarmerDetails = async (farmerId) => {
     try {
       const contractToUse = contract || publicContract;
@@ -249,7 +249,7 @@ const Web3FarmerComponent = () => {
       setError(`Failed to fetch farmer details: ${error.message}`);
     }
   };
-
+//feting the farmer details
   const sendNotificationForFarmerAdded = async(farmerCountNumber)=>{
     if(!ethersSigner){
       console.error('Ether Signer is not initialized')
@@ -309,7 +309,7 @@ const Web3FarmerComponent = () => {
     
   }
 
-
+// returning and showing necessary details on the screen
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <div className="max-w-2xl mx-auto p-6">
@@ -480,7 +480,7 @@ const CropDetailsPage = () => {
       </div>
     );
   }
-
+// authenticated page to show farmer authenticated
   if (error || !farmerDetails || !cropDetails) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
