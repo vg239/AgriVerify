@@ -5,9 +5,12 @@ import QRCode from 'qrcode';
 import contractABI from './abi.json';
 import Dashboard from './Dashboard';
 import './App.css';
+import { ethers } from 'ethers';
+import { PushAPI, CONSTANTS } from '@pushprotocol/restapi';
 
 const contractAddress = "0xb7eA2CeeBfAc1cd9eEFB7C9fCB401e30596EC850";
 const ALCHEMY_RPC = "https://eth-sepolia.g.alchemy.com/v2/lQZfG4SqJSoj1lBu4NsFN1AbmHhRhAtH";
+const channelInCAIP = "eip155:11155111:0x210406844A1B98EF2729398c4BF9700238fF0a76"
 
 const publicWeb3 = new Web3(new Web3.providers.HttpProvider(ALCHEMY_RPC));
 
@@ -93,6 +96,8 @@ const Web3FarmerComponent = () => {
   const [error, setError] = useState('');
   const [publicContract, setPublicContract] = useState(null);
 
+  const [ethersSigner, setEthersSigner] = useState(null); //this is for the push protocol (using ethers to implement push protocol)
+
   const [farmerName, setFarmerName] = useState('');
   const [cropName, setCropName] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -117,6 +122,14 @@ const Web3FarmerComponent = () => {
         setAccount(accounts[0]);
         const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
         setContract(contractInstance);
+
+        //setting up the ethers wallet in order to handle the push notifications 
+        const ethersProviderInstance = new ethers.providers.Web3Provider(window.ethereum);
+        // console.log(ethersProviderInstance)
+        const ethersSignerInstance = ethersProviderInstance.getSigner();
+        setEthersSigner(ethersSignerInstance);
+        // console.log(ethersSignerInstance)
+
       } catch (error) {
         setError("Failed to connect to MetaMask");
       }
@@ -147,6 +160,7 @@ const Web3FarmerComponent = () => {
       setFarmerName('');
       setCrops([]);
       fetchFarmerDetails(farmerCountNumber);
+      await sendNotificationForFarmerAdded(farmerCountNumber)
     } catch (error) {
       setError(`Failed to add farmer: ${error.message}`);
     }
@@ -233,6 +247,35 @@ const Web3FarmerComponent = () => {
       setError(`Failed to fetch farmer details: ${error.message}`);
     }
   };
+
+  const sendNotificationForFarmerAdded = async(farmerCountNumber)=>{
+    if(!ethersSigner){
+      console.error('Ether Signer is not initialized')
+    }
+    else{
+      try {
+        const userSigner = await PushAPI.initialize(ethersSigner, {
+          env: CONSTANTS.ENV.STAGING,
+        });
+        console.log(userSigner.account)
+  
+        const subscribeStatus = await userSigner.notification.subscribe(channelInCAIP);
+        console.log(subscribeStatus)
+    
+        // Sending notification using the userSigner with the correct syntax
+        const sendNotifRes = await userSigner.channel.send([`${userSigner.account}`], {
+          notification: { title: 'New Farmer Added', body: `Welcome to Agriverify. Your Farmer ID is ${farmerCountNumber}`},
+          }
+        );
+        console.log(sendNotifRes)
+  
+  
+        console.log('Notification sent:', sendNotifRes);
+      } catch (error) {
+        console.error('Error sending notification:', error);
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
